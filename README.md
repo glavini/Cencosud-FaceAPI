@@ -15,6 +15,10 @@ Hecha esta breve introducción, pasemos a trabajar en la implementación de la P
 - [Manos a la Obra](#manos-a-la-obra)
   - [Paso 1: Setup de la Solución](#paso-1-setup-de-la-solución)
   - [Paso 2: Implementación del Análisis de Imágenes](#paso-2-implementación-del-análisis-de-imágenes)
+  - [Paso 3: Implementación de la Gestión de Grupos](#paso-3-implementación-de-la-gestión-de-grupos)
+  - [Paso 4: Implementación de la Gestión de Personas](#paso-4-implementación-de-la-gestión-de-personas)
+  - [Paso 5: Implementación de la Gestión de Caras](#paso-5-implementación-de-la-gestión-de-caras)
+  - [Paso 6: Implementación del Reconocimiento de Rostros](#paso-6-implementación-del-reconocimiento-de-rostros)
 
 
 ## Pre-requisitos
@@ -93,6 +97,28 @@ Si la _Subscription Key_ fue generada correctamente y el endpoint configurado de
 7. Navegar las diferentes páginas de la aplicación (Groups, People, Faces, Test) para validar que lsa mismas se muestren correctamente
    - _Por favor, aún no des de alta registros a través de los ABMs, ya que la implementación está incompleta y podrían quedar datos basura en la Base de Datos que nos compliquen la implementación posterior_
 
+#### ¿Necesitás ayuda?
+No te preocupes, a continuación te proporcionamos el código a implementar para que puedas validar tu solución:
+
+<blockquote>
+  <details>
+    <summary> :no_entry: Solución :no_entry: </summary>
+  <details>
+    <summary>BF.POC.FaceAPI.Business.Clients.FaceAPIClient</summary>
+
+  ```csharp
+        public FaceAPIClient()
+        {
+            var subscriptionKey = ConfigurationManager.AppSettings["FaceApiSubscriptionKey"];
+            var endpoint = ConfigurationManager.AppSettings["FaceApiEndpoint"];
+
+            faceServiceClient = new FaceServiceClient(subscriptionKey, endpoint);
+        }
+  ```
+  </details>
+  </details>
+</blockquote>
+
 
 ### Paso 2: Implementación del Análisis de Imágenes
 De la misma forma que hicimos con Postman previamente, vamos a realizar una implementación auxiliar que nos va a servir para validar el correcto funcionamiento e integración de Face API con la Solución, y por qué no, permitirnos jugar con la API pasándole diferentes imágenes a analizar y pudiendo ver cómo funciona la lógica de detección de emociones.
@@ -111,4 +137,228 @@ Para poder realizar la implementación, se deberán seguir los pasos detallados 
    - Indicar por parámetro que no se desean obtener los _face landmarks_ en la respuesta
    - Proporcionar los _face attributes_ a analizar pasando como cuarto parámetro la propiedad `faceAttributes` ya definida en la clase.
 3. Ejecutar la aplicación, navegar a la pantalla Test y realizar diferentes pruebas para validar la correcta integración con la API.
+
+#### ¿Necesitás ayuda?
+No te preocupes, a continuación te proporcionamos el código a implementar para que puedas validar tu solución:
+
+<blockquote>
+  <details>
+    <summary> :no_entry: Solución :no_entry: </summary>
+  <details>
+    <summary>BF.POC.FaceAPI.Business.Clients.FaceAPIClient</summary>
+
+  ```csharp
+        public async Task<Face[]> FaceDetectAsync(byte[] image)
+        {
+            var stream = new MemoryStream(image);
+
+            return await faceServiceClient.DetectAsync(stream, true, false, faceAttributes);
+        }
+  ```
+  </details>
+  </details>
+</blockquote>
+
+
+### Paso 3: Implementación de la Gestión de Grupos
+Los grupos son las entidades que nos permitirán agrupar a diferentes personas bajo una misma temática para luego poder realizar el reconocimiento facial. Podés tener tantos grupos como desees, y tantas personas en cada uno de ellos como necesites. El punto es tenerlos segmentados para optimizar el _matching_ de los algoritmos de **Cognitive Services**.
+
+Es por ello que lo primero que vamos a realizar es finalizar la implementación de los Grupos en nuestra aplicación.
+
+_Si bien los Grupos se crean en la API y se gestionan desde allí, también estaremos guardando esta información en nuestra Base de Datos. Tené en cuenta esto a la hora de completar la funcionalidad correspondiente._
+
+_Por otro lado, para el taller vamos a utilizar `Persons Groups` y no `Large Persons Groups`. lo mismo va a aplicar para el resto de los componentes. Por favor, tené en cuenta esto a la hora de realizar la implementación de la lógica en la aplicación._
+
+Para poder realizar la implementación, se deberán seguir los pasos detallados a continuación:
+1. En la _class_ `BF.POC.FaceAPI.Business.GroupManager` implementar los _methods_ `AddAsync()` y `UpdateAsync()`
+   - Dentro de ellos invocar a los métodos de la _property_ `faceServiceClient` correspondientes (_ojo! son los métodos de nuestro cliente y no de Microsoft.ProjectOxford; recordá que la integración se realiza de la siguiente forma: `UI <<->> Manager <<->> Client <<->> Microsoft.ProjectOxford <<->> Face API`_).
+   - En este punto debemos considerar que no podemos crear dos grupos con el mismo código en Face API, por eso en el _method_ `AddAsync` debemos validar que ya no exista previamente. En el caso del _method_ `UpdateAsync` no ejecutamos esta validación ya que desde la pantalla se limita la posibilidad de modificar este valor (_en un contexto real, no obstante, recomendamos ampliamente profundizar estas validaciones en ambos métodos a los fines de evitar eventuales ataques de usuarios malintencionados_).
+2. En la _class_ `BF.POC.FaceAPI.Business.Clients.FaceAPIClient` implementar los _methods_ `GroupCreateAsync()` y `GroupUpdateAsync()`
+2. También en la _class_ `BF.POC.FaceAPI.Business.Clients.FaceAPIClient` implementar el _method_ `GroupExistsAsync()`
+   - De esta forma vamos a poder validar si el código del grupo ya se encuentra registrado en Face API o no.
+   - Si la consulta a Face API retorna un valor distinto a `null`, entonces el código de grupo ya está registrado y no lo podremos usar.
+   - Si el grupo no existe, la consulta retornará una `FaceAPIException` con el _code_ `PersonGroupNotFound`.
+4. Ejecutar la aplicación, navegar a la pantalla Groups y realizar diferentes pruebas para validar la correcta integración con la API y el repositorio. Si se desea, también se pueden ejecutar _requests_ a Face API mediante Postman para validar que los datos se están registrando correctamente.
+
+#### ¿Necesitás ayuda?
+No te preocupes, a continuación te proporcionamos el código a implementar para que puedas validar tu solución:
+
+<blockquote>
+  <details>
+  <summary> :no_entry: Solución :no_entry: </summary>
+  <details>
+    <summary>BF.POC.FaceAPI.Business.GroupManager</summary>
+
+  ```csharp
+        public async Task AddAsync(Group group)
+        {
+            if (!(await faceAPIClient.GroupExistsAsync(group.Code)))
+            {
+                await faceAPIClient.GroupCreateAsync(group.Code, group.Name);
+
+                await groupRepository.AddAsync(group);
+            }
+            else
+            {
+                throw new BusinessException($"Person group '{group.Code}' already exists.");
+            }
+        }
+
+        public async Task UpdateAsync(Group group)
+        {
+            await faceAPIClient.GroupUpdateAsync(group.Code, group.Name);
+
+            await groupRepository.UpdateAsync(group);
+        }
+  ```
+  </details>
+  <details>
+    <summary>BF.POC.FaceAPI.Business.Clients.FaceAPIClient</summary>
+
+  ```csharp
+        public async Task<bool> GroupExistsAsync(string code)
+        {
+            try
+            {
+                return await faceServiceClient.GetPersonGroupAsync(code) != null;
+            }
+            catch (FaceAPIException ex)
+            {
+                if (ex.ErrorCode == "PersonGroupNotFound")
+                {
+                    return false;
+                }
+                throw;
+            }
+        }
+
+        public async Task GroupCreateAsync(string code, string name)
+        {
+            await faceServiceClient.CreatePersonGroupAsync(code, name);
+        }
+
+        public async Task GroupUpdateAsync(string code, string name)
+        {
+            await faceServiceClient.UpdatePersonGroupAsync(code, name);
+        }
+  ```
+  </details>
+  </details>
+</blockquote>
+
+
+### Paso 4: Implementación de la Gestión de Personas
+Las Personas son aquellas entidades que nos van a permitir registrar los datos de las personas en un grupo, y contener las diferentes Caras (o Faces) que registraremos en el siguiente paso.
+
+_De la misma forma que con los grupos, vamos a estar registrando los datos tanto en Face API como en nuestro repositorio a fines de poder manejar luego las imágenes asociadas a las caras de cada persona._
+
+Para poder realizar la implementación, se deberán seguir los pasos detallados a continuación:
+1. En la _class_ `BF.POC.FaceAPI.Business.PersonManager` implementar los _methods_ `AddAsync()` y `UpdateAsync()`
+   - Dentro de ellos invocar a los métodos de la _property_ `faceServiceClient` correspondientes
+   - Al pasar los parámetros, tené en cuenta que el código del grupo lo vas a necesitar obtener previamente, y el resto de los parámetros lo vas a poder obtener la entidad `person`.
+   - En el _method_ `AddAsync()` no te olvides de asignar el PersonId obtenido de Face API a la _property_ correspondiente antes de invocar al repositorio para guardar los datos.
+   - Implementar en ambos _methods_ las llamadas al repositorio de personas.
+2. En la _class_ `BF.POC.FaceAPI.Business.Clients.FaceAPIClient` implementar los _methods_ `PersonCreateAsync()` y `PersonUpdateAsync()` llamando a los métodos correspondientes de la API de Face. Si tenés dudas respecto qué métodos invocar, podés consultar la documentación proporcionada más arriba en este archivo.
+3. Ejecutar la aplicación, navegar a la pantalla People y realizar diferentes pruebas para validar la correcta integración con la API y el repositorio. La forma más rápida de validar que la misma se ha realizado correctamente es verificando que una vez dada de alta la persona, la columna _Person ID_ muestre el _Guid_ proporcionado por la API de Face. Otra alternativa es ejecutar _requests_ a Face API mediante Postman para validar que los datos se están registrando correctamente.
+
+#### ¿Necesitás ayuda?
+No te preocupes, a continuación te proporcionamos el código a implementar para que puedas validar tu solución:
+
+<blockquote>
+  <details>
+  <summary> :no_entry: Solución :no_entry: </summary>
+  <details>
+    <summary>BF.POC.FaceAPI.Business.PersonManager</summary>
+
+  ```csharp
+        public async Task AddAsync(Person person)
+        {
+            var group = groupRepository.GetById(person.GroupId);
+
+            person.APIPersonId = await faceAPIClient.PersonCreateAsync(group.Code, person.Fullname);
+
+            await personRepository.AddAsync(person);
+        }
+
+        public async Task UpdateAsync(Person person)
+        {
+            var group = groupRepository.GetById(person.GroupId);
+
+            await faceAPIClient.PersonUpdateAsync(group.Code, person.APIPersonId, person.Fullname);
+
+            await personRepository.UpdateAsync(person);
+        }
+  ```
+  </details>
+  <details>
+    <summary>BF.POC.FaceAPI.Business.Clients.FaceAPIClient</summary>
+
+  ```csharp
+        public async Task<Guid> PersonCreateAsync(string groupCode, string personName)
+        {
+            return (await faceServiceClient.CreatePersonInPersonGroupAsync(groupCode, personName)).PersonId;
+        }
+
+        public async Task PersonUpdateAsync(string groupCode, Guid personId, string personName)
+        {
+            await faceServiceClient.UpdatePersonInPersonGroupAsync(groupCode, personId, personName);
+        }
+  ```
+  </details>
+  </details>
+</blockquote>
+
+
+### Paso 5: Implementación de la Gestión de Caras
+Llegamos al último paso necesario antes de poder implementar el reconocimiento de rostros en nuestra aplicación. En este punto vamos a trabajar la implementación de la registración de caras a través de diferentes imágenes para cada una de las personas de un grupo dado.
+
+_Es importante que consideremos que, al registrar caras para una persona, utilicemos imágenes donde figure una única cara, sino el algoritmo no va a saber qué rostro es el que corresponde a la persona. No obstante, en la POC vamos a controlar esto, validando que exista una única persona en la imagen proporcionada.
+
+Para poder realizar la implementación, se deberán seguir los pasos detallados a continuación:
+1. En la _class_ `BF.POC.FaceAPI.Business.FaceManager` implementar el _method_ `AddAsync()`
+   - Implementar la llamada al _method_ correspondiente de nuestra _Facade_ para agregar la imagen a Face API
+   - No te olvides de asignar el FaceId obtenido de Face API a la _property_ `face.APIFaceId` antes de invocar al repositorio para guardar los datos.
+   - Implementar la llamada al _method_ `AddAsync` del `FaceRepository` para guardar los datos de la imagen y su FaceId correspondiente
+   - Implementar la llamada al _method_ `GroupTrainAsync()` de nuestra _Facade_ para que le indique a Face API que se reentrene para el grupo indicado a fines de poder realizar luego el reconocimiento de rostros.
+2. En la _class_ `BF.POC.FaceAPI.Business.Clients.FaceAPIClient` implementar el _method_ `FaceCountFacesAsync()`
+   - Este método es necesario para poder validar en la imagen proporcionada cuántas caras existen.
+   - Realizar la implementación de forma similar a como habíamos hecho previamente en la implementación de la página Test
+   - Pero esta vez, en vez de pasar como cuarto parámetro la lista completa de _Face Attributes_, pasemos sólo `new FaceAttributeType[] { }` a fines de no sobrecargar a la API con información que luego no vamos a utilizar.
+   - Utilizar la firma que contempla un objeto de tipo `Stream`
+   - Retornar la lista de Faces que devuelve la API para que sea utilizada por el _Manager_ y determinar si la imagen es válida o no
+3. En la _class_ `BF.POC.FaceAPI.Business.Clients.FaceAPIClient` implementar el _method_ `FaceAddAsync()`
+   - A través de este método vamos a dar de alta la cara de la persona en la API de Face
+   - Para ello, deberemos invocar al _method_ correspondiente de Face API
+   - Utilizar la firma que contempla un objeto de tipo `Stream`
+   - Y retornar el valor `PersistedFaceId` retornado por la API para que pueda ser utilizado por el _Manager_
+4. En la _class_ `BF.POC.FaceAPI.Business.Clients.FaceAPIClient` implementar el _method_ `GroupTrainAsync()`
+   - Una vez que se ha agregado una nueva cara a alguna de las personas del grupo, es necesario entrenar a Face API para que pueda realizar el reconocimiento de rostros. Para ello, sólo deberemos invocar al _method_ que permite entrenar un rupo de personas, y la API realizará todo el trabajo por nosotros.
+5. Ejecutar la aplicación, navegar a la pantalla Faces y realizar diferentes pruebas para validar la correcta integración con la API y el repositorio. La forma más rápida de validar que la misma se ha realizado correctamente es verificando que una vez dada de alta la cara, la columna _Face ID_ muestre el _Guid_ proporcionado por la API de Face. Otra alternativa es ejecutar _requests_ a Face API mediante Postman para validar que los datos se están registrando correctamente.
+
+
+### Paso 6: Implementación del Reconocimiento de Rostros
+Es momento entonces de avanzar con el reconocimiento de rostros :metal:
+
+Este es el último tramo de la POC, y consistirá en utilizar todo lo que ya hemos creado, más algunos métodos a finalizar su implementación, para poder realizar reconocimiento de personas en imágenes.
+
+Para poder realizar la implementación, se deberán seguir los pasos detallados a continuación:
+1. En la _class_ `BF.POC.FaceAPI.Business.GroupManager` implementar el _method_ `SearchCandidatesAsync()`
+   - Primeramente, deberemos invocar al _method_ `FaceDetectAsync()` para obtener los diferentes rostros presentes en la imagen proporcionada y guardar este valor en una variable llamada `faces` del tipo `Microsoft.ProjectOxford.Face.Contract.Face[]`.
+   - Luego se genera la lista de Candidatos, que va a contener la información reconocida por `FaceDetectAsync()` junto a la persona reconocida, en caso de que haya una coincidencia.
+   - También se deberá generar un _array_ con los FaceIds obtenidos ya que nos será útil en el siguiente paso.
+   - Deberemos invocar _method_ `FaceIdentifyFacesAsync()` para realizar el análisis de las personas y guardar el valor retornado en una variable llamada `identifyResult` del tipo `Microsoft.ProjectOxford.Face.Contract.IdentifyResult[]`.
+   - Luego se deberá itera los resultados obtenidos, y se analizará si para cada registro existe o no un candidato retornado por Face API.
+   - Si existe un Candidato, significa que hubo una coincidencia y Face API retorna el nivel de certidumbre y el _PersonId_ asociado a la persona.
+   - Con el _PesonId_ deberemos buscar los datos de la persona registrada en nuestra Base de Datos.
+   - Y guardaremos el _Confidence Level_ en la propiedad `Confidence` del objeto `candidates[i]` para mostrarlo luego por pantalla.
+2. En la _class_ `BF.POC.FaceAPI.Business.Clients.FaceAPIClient` implementar el _method_ `FaceIdentifyFacesAsync()`
+   - A través de este método se realizará la detección de rostros utilizando Face API
+   - Para ello, deberemos invocar al _method_ correspondiente de la API con la siguiente configuración:
+     - Emplear la firma del método que utiliza un objeto de tipo `Guid[]` para pasar los FaceId
+     - Dado que no estamos utilizando un _Large Person Group_, este valor lo vamos a tomar como `null`
+     - Como valor de corte para determinar si reconoce como válida a una persona o no, vamos a uilizar 65%
+     - Vamos a trabajar con un solo candidato retornado por cada FaceId
+   - Retornar la respuesta de la API para que pueda ser utilizada por el _Manager_ de Grupos
+3. Ejecutar la aplicación, navegar a la pantalla Groups y seleccionar la opción _Search for a Person_ y realizar diferentes pruebas para validar la correcta integración con la API y el algoritmo de reconocimiento. En esta pantalla, sí se puede subir una imagen con varias personas y ver si reconoce a las que hayamos registrado previamente o no.
+
 
