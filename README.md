@@ -19,6 +19,8 @@ Hecha esta breve introducción, pasemos a trabajar en la implementación de la P
   - [Paso 4: Implementación de la Gestión de Personas](#paso-4-implementación-de-la-gestión-de-personas)
   - [Paso 5: Implementación de la Gestión de Caras](#paso-5-implementación-de-la-gestión-de-caras)
   - [Paso 6: Implementación del Reconocimiento de Rostros](#paso-6-implementación-del-reconocimiento-de-rostros)
+- [Conclusiones](#conclusiones)
+- [¡Experimentá con la solución!](#experimentá-con-la-solución)
 
 
 ## Pre-requisitos
@@ -335,6 +337,68 @@ Para poder realizar la implementación, se deberán seguir los pasos detallados 
    - Una vez que se ha agregado una nueva cara a alguna de las personas del grupo, es necesario entrenar a Face API para que pueda realizar el reconocimiento de rostros. Para ello, sólo deberemos invocar al _method_ que permite entrenar un rupo de personas, y la API realizará todo el trabajo por nosotros.
 5. Ejecutar la aplicación, navegar a la pantalla Faces y realizar diferentes pruebas para validar la correcta integración con la API y el repositorio. La forma más rápida de validar que la misma se ha realizado correctamente es verificando que una vez dada de alta la cara, la columna _Face ID_ muestre el _Guid_ proporcionado por la API de Face. Otra alternativa es ejecutar _requests_ a Face API mediante Postman para validar que los datos se están registrando correctamente.
 
+#### ¿Necesitás ayuda?
+No te preocupes, a continuación te proporcionamos el código a implementar para que puedas validar tu solución:
+
+<blockquote>
+  <details>
+  <summary> :no_entry: Solución :no_entry: </summary>
+  <details>
+    <summary>BF.POC.FaceAPI.Business.FaceManager</summary>
+
+  ```csharp
+        public async Task AddAsync(Face face)
+        {
+            var person = personRepository.GetById(face.PersonId);
+            var group = groupRepository.GetById(person.GroupId);
+
+            var faces = await faceAPIClient.FaceCountFacesAsync(face.Photo);
+
+            if (faces.Length == 0)
+            {
+                throw new BusinessException("No faces found in the selected image");
+            }
+
+            if (faces.Length > 1)
+            {
+                throw new BusinessException("To many faces found in the selected image");
+            }
+
+            face.APIFaceId = await faceAPIClient.FaceAddAsync(group.Code, person.APIPersonId, face.Photo);
+
+            await faceRepository.AddAsync(face);
+
+            await faceAPIClient.GroupTrainAsync(group.Code);
+        }
+  ```
+  </details>
+  <details>
+    <summary>BF.POC.FaceAPI.Business.Clients.FaceAPIClient</summary>
+
+  ```csharp
+        public async Task<Guid> FaceAddAsync(string groupCode, Guid personId, byte[] face)
+        {
+            var stream = new MemoryStream(face);
+
+            return (await faceServiceClient.AddPersonFaceInPersonGroupAsync(groupCode, personId, stream)).PersistedFaceId;
+        }
+
+        public async Task<Face[]> FaceCountFacesAsync(byte[] face)
+        {
+            var stream = new MemoryStream(face);
+
+            return await faceServiceClient.DetectAsync(stream, true, false, new FaceAttributeType[] { });
+        }
+
+        public async Task GroupTrainAsync(string code)
+        {
+            await faceServiceClient.TrainPersonGroupAsync(code);
+        }
+  ```
+  </details>
+  </details>
+</blockquote>
+
 
 ### Paso 6: Implementación del Reconocimiento de Rostros
 Es momento entonces de avanzar con el reconocimiento de rostros :metal:
@@ -361,4 +425,110 @@ Para poder realizar la implementación, se deberán seguir los pasos detallados 
    - Retornar la respuesta de la API para que pueda ser utilizada por el _Manager_ de Grupos
 3. Ejecutar la aplicación, navegar a la pantalla Groups y seleccionar la opción _Search for a Person_ y realizar diferentes pruebas para validar la correcta integración con la API y el algoritmo de reconocimiento. En esta pantalla, sí se puede subir una imagen con varias personas y ver si reconoce a las que hayamos registrado previamente o no.
 
+#### ¿Necesitás ayuda?
+No te preocupes, a continuación te proporcionamos el código a implementar para que puedas validar tu solución:
+
+<blockquote>
+  <details>
+  <summary> :no_entry: Solución :no_entry: </summary>
+  <details>
+    <summary>BF.POC.FaceAPI.Business.GroupManager</summary>
+
+  ```csharp
+        public async Task<List<Candidate>> SearchCandidatesAsync(int id, byte[] image)
+        {
+            var group = groupRepository.GetById(id);
+
+            Microsoft.ProjectOxford.Face.Contract.Face[] faces;
+            faces = await faceAPIClient.FaceDetectAsync(image);
+
+            if (faces.Length > 0)
+            {
+                var candidates = faces.Select(c => new Candidate { Gender = c.FaceAttributes.Gender, FaceRectangle = c.FaceRectangle }).ToList();
+                var faceIDs = faces.Select(p => p.FaceId).ToArray();
+
+                Microsoft.ProjectOxford.Face.Contract.IdentifyResult[] identifyResult;
+                identifyResult = await faceAPIClient.FaceIdentifyFacesAsync(group.Code, faceIDs);
+
+                for (int i = 0; i < identifyResult.Length; i++)
+                {
+                    var result = identifyResult[i];
+
+                    if (result.Candidates.Length > 0)
+                    {
+                        var candidate = result.Candidates[0];
+                        var person = personRepository.GetByAPIPersonId(candidate.PersonId);
+
+                        if (person != null)
+                        {
+                            candidates[i].AssociateWith(person);
+                            candidates[i].Confidence = candidate.Confidence;
+                        }
+                    }
+                }
+
+                return candidates;
+            }
+            else
+            {
+                return new List<Candidate>();
+            }
+        }
+  ```
+  </details>
+  <details>
+    <summary>BF.POC.FaceAPI.Business.Clients.FaceAPIClient</summary>
+
+  ```csharp
+        public async Task<IdentifyResult[]> FaceIdentifyFacesAsync(string groupCode, Guid[] faceIDs)
+        {
+            string largePersonGroupId = null;
+            var confidenceThreshold = (float)0.65;
+            var maxNumOfCandidatesReturned = 1;
+
+            return await faceServiceClient.IdentifyAsync(faceIDs, groupCode, largePersonGroupId, confidenceThreshold, maxNumOfCandidatesReturned);
+        }
+  ```
+  </details>
+  </details>
+</blockquote>
+
+
+## Conclusiones
+:nerd_face: Es tiempo de algunas conclusiones.
+
+Como hemos podido ver, implementar Face API no es complejo, sino que muy por lo contrario es bastante sencillo. Además, la API es fácil de aprender ya que los métodos están muy bien documentados y además sus nombres son representativos de su funcionalidad.
+
+Es cierto, en la aplicación que se presenta hay mucho mas diseño, arquitectura y funcionalidad desarrollada, pero es lo que típicamente se necesita para construir una aplicación dede cero. Si analizamos el código generado, y en nuestro caso el tiempo en construir la solución, veremos que aplica la regla del 80/20, en donde el 80% se lo llevó el diseño y construcción de la solución en general, y sólo el 20% (o menos) la integración con Face API.
+
+Esto nos demuestra qué tan fácil es integrarnos con esta plataforma, y qué poco tiempo adicional se requiere para integrarnos con la API. Lo que nos permite enfocarnos más en la funcionalidad en sí a construir, y no en la implementación de complejos algoritmos de procesamiento de imágenes, ya que esto se brinda resuelto del lado de _Cognitive Services_.
+
+
+## ¡Experimentá con la solución! 
+:muscle: :muscle: ¿Te sobró el tiempo? ¿Te quedaste con ganas de hacer más cosas? :muscle: :muscle:
+
+Este es un buen momento entonces para que evaluemos otras cosas que se podrían hacer con la aplicación:
+
+1. Podés probar subir una amplia cantidad de personas a un grupo, con gran cantidad de imágenes asociadas y evaluar cómo responde el algoritmo de Face API.
+2. Podés agregar la funcionalidad que permita eliminar un grupo
+   - Te recomiendo que le des una leída a la [documentación oficial de la API](https://westus.dev.cognitive.microsoft.com/docs/services/563879b61984550e40cbbe8d/operations/563879b61984550f30395245) para entender el contexto del cambio
+   - Además de eliminar el Group en Face API, vas a tener que eliminar el Grupo, las Personas y las Imágenes asociadas en el repositorio local
+3. Podés agregar la funcionalidad que permita eliminar una persona de un grupo
+   - Te recomiendo que le des una leída a la [documentación oficial de la API](https://westus.dev.cognitive.microsoft.com/docs/services/563879b61984550e40cbbe8d/operations/563879b61984550f3039523d) para entender el contexto del cambio
+   - Además de eliminar a la Person en Face API, vas a tener que eliminar a la Persona y las Imágenes asociadas en el repositorio local
+   - Y adicionalmente, vas a tener que reentrenar a Face API para el grupo afectado, a fines de que pueda mantenerse actualizado para realizar los reconocimientos faciales posteriores
+4. Podés agregar la funcionalidad que permita eliminar una cara de una persona de un grupo
+   - Te recomiendo que le des una leída a la [documentación oficial de la API](https://westus.dev.cognitive.microsoft.com/docs/services/563879b61984550e40cbbe8d/operations/563879b61984550f3039523e) para entender el contexto del cambio
+   - Además de eliminar la Face en Face API, vas a tener que eliminar la Imagen asociada en el repositorio local
+   - Y adicionalmente, vas a tener que reentrenar a Face API para el grupo afectado, a fines de que pueda mantenerse actualizado para realizar los reconocimientos faciales posteriores
+5. Además de Face API, podemos integrarnos fácilmente con **[Computer Vision](https://azure.microsoft.com/en-us/services/cognitive-services/computer-vision/)** utilizando lo que ya tenemos construido:
+   - Crear una nueva _Subsription_ a **Computer Vision** según se indica en el siguiente [artículo](https://docs.microsoft.com/es-es/azure/cognitive-services/Computer-vision/vision-api-how-to-topics/howtosubscribe)
+   - Agregar una nueva página a nuestra solución, llamada `ComputerVisionTest`, implementando las vistas y el controller tomando como base la página Test que ya tenemos finalizada
+   - Implementar un nuevo _Client, llamado `ComputerVisionAPIClient`
+   - Descargar el paquete de Nuget _Microsoft.ProjectOxford.Vision_ para integrarnos con _Computer Vision_
+   - Realizar la implementación de un método que permita analizar una imagen y retornar el resultado a la pantalla, similar a lo que ya se encuentra implementado en Face API Test.
+   - Te recomendamos que tengas a manos los siguientes links ya que seguramente te sean de ayuda durante la implementación:
+     - [Página principal de Computer Vision API](https://azure.microsoft.com/en-us/services/cognitive-services/computer-vision/)
+     - [Página con la documentación, guías rápidas y tutoriales](https://docs.microsoft.com/en-us/azure/cognitive-services/computer-vision/)
+     - [Página con las referencias de la API](https://westus.dev.cognitive.microsoft.com/docs/services/5adf991815e1060e6355ad44/operations/56f91f2e778daf14a499e1fa)
 
