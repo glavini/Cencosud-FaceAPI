@@ -47,24 +47,32 @@ namespace BF.POC.FaceAPI.Business
         public async Task AddAsync(Face face)
         {
             // ToDo: Get the person details from the personRepository
-            throw new NotImplementedException();
+            Person person = personRepository.GetById(face.PersonId);
 
             // ToDo: Get the group details from the groupRepository
-            throw new NotImplementedException();
+            Group group = groupRepository.GetById(person.GroupId);
 
             // ToDo: Call faceAPIClient and count how many faces are in current image.
             //        - If there is no faces in the image, then throw a new BusinessException with the message "No faces found in the selected image"
             //        - If there is more than one face in the image, then throw a new BusinessException with the message "To many faces found in the selected image"
-            throw new NotImplementedException();
+            int count = (await faceAPIClient.FaceCountFacesAsync(face.Photo)).Length;
+            if (count == 0)
+            {
+                throw new BusinessException("No faces found in the selected image");
+            }
+            else if (count > 1)
+            {
+                throw new BusinessException("To many faces found in the selected image");
+            }
 
             // ToDo: Call faceAPIClient to add a new face, the get FaceId and assign it to APIFaceId property...
-            throw new NotImplementedException();
+            face.APIFaceId = await faceAPIClient.FaceAddAsync(group.Code, person.APIPersonId, face.Photo);
 
             // ToDo: Call faceRepository to save the new person
-            throw new NotImplementedException();
+            await faceRepository.AddAsync(face);
 
             // ToDo: Call faceAPIClient to train the Network again
-            throw new NotImplementedException();
+            await faceAPIClient.GroupTrainAsync(group.Code);
         }
 
     }

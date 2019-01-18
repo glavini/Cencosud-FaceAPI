@@ -39,25 +39,25 @@ namespace BF.POC.FaceAPI.Business
         public async Task AddAsync(Person person)
         {
             // ToDo: Get the group details from the groupRepository
-            throw new NotImplementedException();
+            var group = groupRepository.GetById(person.GroupId);
 
             // ToDo: Call faceAPIClient to create a new person. Do not forget to save APIPersonId
-            throw new NotImplementedException();
+            person.APIPersonId = await faceAPIClient.PersonCreateAsync(group.Code, person.Fullname);
 
             // ToDo: Call personRepository to save the new person
-            throw new NotImplementedException();
+            await personRepository.AddAsync(person);
         }
 
         public async Task UpdateAsync(Person person)
         {
             // ToDo: Get the group details from the groupRepository
-            throw new NotImplementedException();
+            var group = groupRepository.GetById(person.GroupId);
 
             // ToDo: Call faceAPIClient to update a person
-            throw new NotImplementedException();
+            await faceAPIClient.PersonUpdateAsync(group.Code, person.APIPersonId, person.Fullname);
 
             // ToDo: Call personRepository to save the person
-            throw new NotImplementedException();
+            await personRepository.UpdateAsync(person);
         }
 
     }

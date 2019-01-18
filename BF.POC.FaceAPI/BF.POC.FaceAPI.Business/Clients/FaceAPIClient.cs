@@ -34,6 +34,10 @@ namespace BF.POC.FaceAPI.Business.Clients
         public FaceAPIClient()
         {
             // ToDo: initialize faceServiceClient object here...
+            var subscriptionKey = ConfigurationManager.AppSettings["FaceApiSubscriptionKey"];
+            var endpoint = ConfigurationManager.AppSettings["FaceApiEndpoint"];
+
+            faceServiceClient = new FaceServiceClient(subscriptionKey, endpoint);
         }
 
         #region - Group Managment -
@@ -41,31 +45,38 @@ namespace BF.POC.FaceAPI.Business.Clients
         public async Task<bool> GroupExistsAsync(string code)
         {
             // ToDo: Create a try-catch block
-            throw new NotImplementedException();
-
-            // ToDo: In the try section, invoke faceServiceClient and get the group by code and return a boolean value if exists
-            throw new NotImplementedException();
-
-            // ToDo: In the catch section, capture FaceAPIException and if the error code is "PersonGroupNotFound", returns false.
-            throw new NotImplementedException();
+            try
+            {
+                // ToDo: In the try section, invoke faceServiceClient and get the group by code and return a boolean value if exists
+                return await faceServiceClient.GetPersonGroupAsync(code) != null;
+            }
+            catch (FaceAPIException ex)
+            {
+                // ToDo: In the catch section, capture FaceAPIException and if the error code is "PersonGroupNotFound", returns false.
+                if (ex.ErrorCode == "PersonGroupNotFound")
+                {
+                    return false;
+                }
+                throw;
+            }
         }
 
         public async Task GroupCreateAsync(string code, string name)
         {
             // ToDo: Invoke the API method to create a new person group
-            throw new NotImplementedException();
+            await faceServiceClient.CreatePersonGroupAsync(code, name);
         }
 
         public async Task GroupUpdateAsync(string code, string name)
         {
             // ToDo: Invoke the API method to update an existing person group
-            throw new NotImplementedException();
+            await faceServiceClient.UpdatePersonGroupAsync(code, name);
         }
 
         public async Task GroupTrainAsync(string code)
         {
             // ToDo: Invoke the API method to train an existing person group
-            throw new NotImplementedException();
+            await faceServiceClient.TrainPersonGroupAsync(code);
         }
 
         #endregion - Group Managment -
@@ -75,13 +86,13 @@ namespace BF.POC.FaceAPI.Business.Clients
         public async Task<Guid> PersonCreateAsync(string groupCode, string personName)
         {
             // ToDo: Invoke the API method to create a new person in an existing person group
-            throw new NotImplementedException();
+            return (await faceServiceClient.CreatePersonInPersonGroupAsync(groupCode, personName)).PersonId;
         }
 
         public async Task PersonUpdateAsync(string groupCode, Guid personId, string personName)
         {
             // ToDo: Invoke the API method to update an existing person in an existing person group
-            throw new NotImplementedException();
+            await faceServiceClient.UpdatePersonInPersonGroupAsync(groupCode, personId, personName);
         }
 
         #endregion - Person Management -
@@ -91,25 +102,25 @@ namespace BF.POC.FaceAPI.Business.Clients
         public async Task<Guid> FaceAddAsync(string groupCode, Guid personId, byte[] image)
         {
             // ToDo: Invoke the API method to add a new face to an existing person
-            throw new NotImplementedException();
+            return (await faceServiceClient.AddPersonFaceAsync(groupCode, personId, new MemoryStream(image))).PersistedFaceId;
         }
 
         public async Task<Face[]> FaceDetectAsync(byte[] image)
         {
             // ToDo: Invoke the API method to detect faces in an image
-            throw new NotImplementedException();
+            return await faceServiceClient.DetectAsync(new MemoryStream(image), true, false, faceAttributes);
         }
 
         public async Task<Face[]> FaceCountFacesAsync(byte[] image)
         {
             // ToDo: Invoke the API method to count faces in an image
-            throw new NotImplementedException();
+            return await faceServiceClient.DetectAsync(new MemoryStream(image), true, false, new FaceAttributeType[] { });
         }
 
         public async Task<IdentifyResult[]> FaceIdentifyFacesAsync(string groupCode, Guid[] faceIDs)
         {
             // ToDo: Invoke the API method to identify a face in an image
-            throw new NotImplementedException();
+            return await faceServiceClient.IdentifyAsync(faceIDs, groupCode, null, 0.65F, 1);
         }
 
         #endregion - Face Management -

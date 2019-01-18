@@ -36,48 +36,72 @@ namespace BF.POC.FaceAPI.Business
         public async Task AddAsync(Group group)
         {
             // ToDo: Check if the group exists using GroupExistsAsync from faceAPIClient
-            throw new NotImplementedException();
+            if (!(await faceAPIClient.GroupExistsAsync(group.Code)))
+            {
+                // ToDo: If the group do not exists, call faceAPIClient to create a group
+                await faceAPIClient.GroupCreateAsync(group.Code, group.Name);
 
-            // ToDo: If the group do not exists, call faceAPIClient to create a group
-            throw new NotImplementedException();
-
-            // ToDo: If the group do not exists, call groupRepository to save the group details
-            throw new NotImplementedException();
-
-            // ToDo: If the group already exists, throw a new BusinessException with the message "Person group '[CODE]' already exists."
-            throw new NotImplementedException();
+                // ToDo: If the group do not exists, call groupRepository to save the group details
+                await groupRepository.AddAsync(group);
+            }
+            else
+            {
+                // ToDo: If the group already exists, throw a new BusinessException with the message "Person group '[CODE]' already exists."
+                throw new BusinessException($"Person group '{group.Code}' already exists.");
+            }
         }
 
         public async Task UpdateAsync(Group group)
         {
             // ToDo: Call faceAPIClient to update a group
-            throw new NotImplementedException();
+            await faceAPIClient.GroupUpdateAsync(group.Code, group.Name);
 
             // ToDo: Call groupRepository to save the group details
-            throw new NotImplementedException();
+            await groupRepository.UpdateAsync(group);
         }
 
         public async Task<List<Candidate>> SearchCandidatesAsync(int id, byte[] image)
         {
             // ToDo: Get the group details from the groupRepository
-            throw new NotImplementedException();
+            Group group = groupRepository.GetById(id);
 
             // ToDo: Call FaceDetectAsync in faceAPIClient and assing its result into a new 'faces' var from type 'Microsoft.ProjectOxford.Face.Contract.Face[]'
-            throw new NotImplementedException();
+            Microsoft.ProjectOxford.Face.Contract.Face[] faces = (await faceAPIClient.FaceDetectAsync(image));
 
             // ToDo: If no faces were detected, then return an empty list
-            throw new NotImplementedException();
+            if (faces.Length == 0)
+            {
+                return new List<Candidate>();
+            }
 
             // ToDo: Create a list of candidates from 'faces' list using our 'Candidate' entity
-            throw new NotImplementedException();
+            var candidates = faces.Select(c => new Candidate { Gender = c.FaceAttributes.Gender, FaceRectangle = c.FaceRectangle }).ToList();
+            var faceIDs = faces.Select(p => p.FaceId).ToArray();
 
             // ToDo: Call FaceIdentifyFacesAsync in faceAPIClient and assing its result into a new 'identifyResult' var from type 'Microsoft.ProjectOxford.Face.Contract.IdentifyResult[]'
-            throw new NotImplementedException();
+            Microsoft.ProjectOxford.Face.Contract.IdentifyResult[] identifyResults = await faceAPIClient.FaceIdentifyFacesAsync(group.Code, faceIDs);
 
             // ToDo: For each item in 'identifyResult':
             //        - Get the first candidate item from it (result.Candidates[0]) and search in our DB for a Person that matching with the same 'PersonId'
             //        - If there is a Person registered in our DB, associate it with the candidate in 'candidates' list and set Confidence to it too
-            throw new NotImplementedException();
+            for (int i = 0; i < identifyResults.Length; i++)
+            {
+                var result = identifyResults[i];
+
+                if (result.Candidates.Length > 0)
+                {
+                    var candidate = result.Candidates[0];
+                    var person = personRepository.GetByAPIPersonId(candidate.PersonId);
+
+                    if (person != null)
+                    {
+                        candidates[i].AssociateWith(person);
+                        candidates[i].Confidence = candidate.Confidence;
+                    }
+                }
+            }
+
+            return candidates;
         }
 
     }
